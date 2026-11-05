@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { SavedSession } from "../backend";
+  import { connectionCard, wolSend } from "../backend/net";
   import { settings } from "../settings.svelte";
   import type { Reachability } from "../status/reach.svelte";
   import { fitMenu } from "../ui/fitMenu";
@@ -31,6 +32,7 @@
   let { library, onopen, onmonitor, newSessionSignal = 0, command = null, reach }: Props = $props();
 
   let search = $state("");
+  let notice = $state("");
   let collapsed = $state<Record<string, boolean>>({});
   let editor = $state<{ editing?: SshSession; folder?: string; prefill?: { host: string; port: number; user?: string; connect?: boolean } } | null>(null);
   let confirm = $state<{ kind: "session" | "folder"; id: string; name: string } | null>(null);
@@ -90,6 +92,39 @@
     if (session.type === "ssh") return `${session.user}@${session.host}`;
     if (session.type === "serial") return session.port;
     return session.host;
+  }
+
+  /** The hover text: where it is, plus the first line of its note. */
+  function tip(session: SavedSession): string {
+    const where = describe(session);
+    const note = session.type === "ssh" ? session.extras?.note?.trim() : "";
+    if (!note) return where;
+    return `${where} — ${note.split("\n")[0]}`;
+  }
+
+  async function copyCard(session: SavedSession) {
+    notice = "";
+    try {
+      const card = await connectionCard(library.file, session.id);
+      await navigator.clipboard.writeText(card.card);
+      notice = "Copied a connection card. It has no passwords.";
+    } catch (err) {
+      message = (err as { message?: string }).message ?? "Couldn't copy the connection card.";
+    }
+  }
+
+  async function wake(session: SavedSession, thenConnect: boolean) {
+    if (session.type !== "ssh" || !session.extras?.mac) return;
+    notice = "";
+    try {
+      await wolSend(session.extras.mac, session.host);
+      notice = thenConnect
+        ? "Wake packet sent. Connecting now — the computer may still be starting."
+        : "Wake packet sent.";
+      if (thenConnect) onopen(session);
+    } catch (err) {
+      message = (err as { message?: string }).message ?? "Couldn't send the wake packet.";
+    }
   }
 
   /** The dot beside a session: how it answered the last check, if it is checked at all. */
@@ -210,7 +245,7 @@
   {:else}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="item" style:padding-left="{6 + depth * 14 + 13}px" oncontextmenu={(e) => openMenu(e, { session: item.session })}>
-      <button class="label" title={describe(item.session)} ondblclick={() => onopen(item.session)}>
+      <button class="label" title={tip(item.session)} ondblclick={() => onopen(item.session)}>
         <span class="glyph"><Icon name={iconOf(item.session)} size={15} /></span>
         {#if dot(item.session)}
           {@const d = dot(item.session)!}
@@ -278,6 +313,11 @@
         <li><button onclick={() => act(() => onmonitor?.(sess))}><Icon name="monitor" size={14} /> Process monitor</button></li>
         <li><button onclick={() => act(() => (forwardsFor = sess))}><Icon name="route" size={14} /> Port forwarding</button></li>
         <li><button onclick={() => act(() => (keySetupFor = sess))}><Icon name="key" size={14} /> Set up key login</button></li>
+        <li><button onclick={() => act(() => void copyCard(sess))}><Icon name="copy" size={14} /> Copy connection card</button></li>
+        {#if sess.extras?.mac}
+          <li><button onclick={() => act(() => void wake(sess, false))}><Icon name="server" size={14} /> Wake</button></li>
+          <li><button onclick={() => act(() => void wake(sess, true))}><Icon name="play" size={14} /> Wake, then connect</button></li>
+        {/if}
       {/if}
       <li class="sep" role="separator"></li>
       <li>
@@ -335,6 +375,7 @@
     </div>
   {/if}
 
+  {#if notice}<p class="message ok side-message">{notice}</p>{/if}
   {#if message}<p class="message error side-message">{message}</p>{/if}
 
   <div class="list">

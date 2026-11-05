@@ -43,9 +43,13 @@
     extra?: { icon: IconName; title: string; disabled?: boolean; onclick: () => void };
     /** Types text at the prompt of the terminal this list belongs to (not available on every list). */
     oncopytoterminal?: (text: string) => void;
+    /** Opens a folder picker and uploads that folder into the folder shown here. */
+    onuploadfolder?: () => void;
+    /** Opens a file picker and uploads those files into the folder shown here. */
+    onuploadfiles?: () => void;
   }
 
-  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", onopenfile, oneditfile, path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal }: Props = $props();
+  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", onopenfile, oneditfile, path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal, onuploadfolder, onuploadfiles }: Props = $props();
 
   let entries = $state<FileEntry[]>([]);
   let loading = $state(false);
@@ -466,6 +470,16 @@
       <span class="count">
         {#if note}{note}{:else if chosen.length}{chosen.length} selected{:else}{visible.length} items{/if}
       </span>
+      {#if onuploadfolder}
+        <button class="btn small" disabled={!files || !path} title="Choose a folder on this computer and copy it here" onclick={onuploadfolder}>
+          Upload folder
+        </button>
+      {/if}
+      {#if onuploadfiles}
+        <button class="btn small" disabled={!files || !path} title="Choose files on this computer and copy them here" onclick={onuploadfiles}>
+          Upload files
+        </button>
+      {/if}
       {#if ontransfer}
         <button class="btn small primary" disabled={chosen.length === 0} onclick={transfer}>
           <Icon name={transferIcon} size={13} />
@@ -775,6 +789,7 @@
   }
   footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     padding: 6px 10px 8px;

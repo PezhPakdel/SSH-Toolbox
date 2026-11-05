@@ -240,6 +240,14 @@ export interface SavedFolder {
   parent: string;
 }
 
+/** Wake address, port knock, a note and folder bookmarks. None of these hold a password. */
+export interface SshExtras {
+  mac: string;
+  knock: string;
+  note: string;
+  bookmarks: string[];
+}
+
 export type SavedSession =
   | {
       type: "ssh";
@@ -257,6 +265,7 @@ export type SavedSession =
       color?: string;
       /** Commands typed once when the shell is ready. */
       startup?: string;
+      extras?: SshExtras;
     }
   | {
       type: "serial";
@@ -332,6 +341,18 @@ export interface MergeResult {
   sessions_added: number;
   folders_added: number;
   skipped: number;
+}
+
+export interface MobaReport {
+  sessions_added: number;
+  folders_added: number;
+  skipped: number;
+  left_out: string[];
+}
+
+/** Adds SSH sessions from a MobaXterm export or configuration. Passwords are not copied. */
+export function mobaImport(path: string): Promise<MobaReport> {
+  return invoke<MobaReport>("moba_import", { path });
 }
 
 /** Adds the sessions of a backup file to the saved ones; what is already saved is kept. */

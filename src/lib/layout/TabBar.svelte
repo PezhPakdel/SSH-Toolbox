@@ -262,7 +262,7 @@
       title="Docker: containers, logs and shells"
       onclick={ondocker}
     >
-      <Icon name="box" size={16} />
+      <Icon name="docker" size={16} />
     </button>
     <button
       class="icon-btn"

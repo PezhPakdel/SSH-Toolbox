@@ -59,6 +59,7 @@ pub fn run() {
     });
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 // Closing the main window ends the app, and with it any other windows.
@@ -185,6 +186,11 @@ pub fn run() {
             commands::snippets::snippets_get,
             commands::snippets::snippets_set,
             commands::link::open_link,
+            commands::net::connection_card,
+            commands::net::link_probe,
+            commands::net::net_ping,
+            commands::net::net_trace,
+            commands::net::wol_send,
             commands::prompt::prompt_respond,
             commands::sessions::sessions_get,
             commands::sessions::ssh_config_import,
@@ -192,6 +198,7 @@ pub fn run() {
             commands::sessions::sessions_save,
             commands::keys::known_hosts_list,
             commands::keys::known_hosts_remove,
+            commands::sessions::moba_import,
             commands::sessions::sessions_export,
             commands::sessions::sessions_import,
             commands::sessions::sessions_set_aside_unreadable,

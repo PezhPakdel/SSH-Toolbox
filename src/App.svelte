@@ -26,6 +26,8 @@
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import AgentPanel from "./lib/agent/AgentPanel.svelte";
   import ScannerDialog from "./lib/scan/ScannerDialog.svelte";
+  import ProbeDialog from "./lib/net/ProbeDialog.svelte";
+  import WakeDialog from "./lib/net/WakeDialog.svelte";
   import { setSessionColors } from "./lib/sessions/colors.svelte";
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
   import Palette, { type PaletteItem } from "./lib/palette/Palette.svelte";
@@ -51,6 +53,8 @@
   let sidebarCommand = $state<{ name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number; user?: string; connect?: boolean } } | null>(null);
   // The network tools window, when it is open.
   let scanner = $state<"network" | "ports" | null>(null);
+  let probe = $state<"ping" | "trace" | null>(null);
+  let waking = $state(false);
   let xserver = $state(false);
   let snippets = $state(false);
   let paletteOpen = $state(false);
@@ -170,10 +174,22 @@
   const footerTarget = $derived.by(() => {
     const tab = workspace.contextTab;
     const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
-    return leaf?.spec?.type === "ssh"
-      ? { kind: "ssh" as const, id: leaf.spec.saved_session_id, name: leaf.title }
-      : { kind: "local" as const };
+    const spec = leaf?.spec;
+    if (!leaf || !spec || spec.type !== "ssh") return { kind: "local" as const };
+    const saved = library.file.session.find((s) => s.type === "ssh" && s.id === spec.saved_session_id);
+    return {
+      kind: "ssh" as const,
+      id: spec.saved_session_id,
+      name: leaf.title,
+      host: saved?.type === "ssh" ? saved.host : "",
+      port: saved?.type === "ssh" ? saved.port : 22,
+    };
   });
+
+  function sshExtras(id: string) {
+    const saved = library.file.session.find((s) => s.type === "ssh" && s.id === id);
+    return saved?.type === "ssh" ? saved.extras : undefined;
+  }
 
   // An FTP session has no terminal. Opening one shows its files until another pane is chosen.
   let ftpOpened = $state<{ kind: "ftp"; id: string; name: string } | null>(null);
@@ -189,6 +205,25 @@
     if (leaf?.spec?.type === "wsl") return { kind: "wsl" as const, distro: leaf.spec.distro, name: leaf.title };
     return null;
   });
+
+  const fileBookmarks = $derived(
+    activeSession?.kind === "ssh" ? (sshExtras(activeSession.id)?.bookmarks ?? []) : [],
+  );
+
+  /** Remembers or forgets the folder the file panel is showing. */
+  function toggleBookmark(path: string) {
+    if (activeSession?.kind !== "ssh" || !path) return;
+    const id = activeSession.id;
+    const session = library.file.session.map((s) => {
+      if (s.type !== "ssh" || s.id !== id) return s;
+      const extras = s.extras ?? { mac: "", knock: "", note: "", bookmarks: [] };
+      const bookmarks = extras.bookmarks.includes(path)
+        ? extras.bookmarks.filter((p) => p !== path)
+        : [...extras.bookmarks, path].slice(0, 40);
+      return { ...s, extras: { ...extras, bookmarks } };
+    });
+    void library.save({ ...library.file, session }).catch(() => {});
+  }
 
   // The SSH server in the active pane, whose Docker the left panel shows.
   const activeSshSession = $derived.by(() => {
@@ -284,7 +319,7 @@
         { label: "New FTP session…", onselect: () => sessionCommand("ftp") },
         { label: "New serial session…", onselect: () => sessionCommand("serial") },
         { label: "Import from ~/.ssh/config…", onselect: () => sessionCommand("import") },
-        { label: "Back up and restore sessions…", onselect: () => (backupOpen = true) },
+        { label: "Configurations…", onselect: () => (backupOpen = true) },
         "separator",
         { label: "Settings…", onselect: () => (showSettings = true) },
       ],
@@ -339,6 +374,9 @@
       items: [
         { label: "Network scanner…", onselect: () => (scanner = "network") },
         { label: "Port scanner…", onselect: () => (scanner = "ports") },
+        { label: "Ping…", onselect: () => (probe = "ping") },
+        { label: "Traceroute…", onselect: () => (probe = "trace") },
+        { label: "Wake a computer…", onselect: () => (waking = true) },
         { label: "X server…", onselect: () => (xserver = true) },
         { label: "Trusted servers (known hosts)…", onselect: () => (knownHostsOpen = true) },
       ],
@@ -580,6 +618,8 @@
             source={activeSession}
             follow={followedFolder}
             terminalSession={activeTerminalSession}
+            bookmarks={fileBookmarks}
+            onbookmark={toggleBookmark}
             onclose={() => (filesOpen = false)} />
         </div>
       {/if}
@@ -592,6 +632,20 @@
       {/if}
     </div>
   </div>
+  {#if probe}
+    <ProbeDialog
+      kind={probe}
+      host={footerTarget.kind === "ssh" ? footerTarget.host : ""}
+      onclose={() => (probe = null)}
+    />
+  {/if}
+  {#if waking}
+    <WakeDialog
+      host={footerTarget.kind === "ssh" ? footerTarget.host : ""}
+      mac={footerTarget.kind === "ssh" ? sshExtras(footerTarget.id)?.mac ?? "" : ""}
+      onclose={() => (waking = false)}
+    />
+  {/if}
   {#if scanner}
     <ScannerDialog initialTab={scanner} onclose={() => (scanner = null)} onnewsession={(host, port) => sessionCommand("ssh", { host, port })} />
   {/if}

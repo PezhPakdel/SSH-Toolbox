@@ -425,6 +425,7 @@ impl Importer<'_> {
             x11: false,
             color: String::new(),
             startup: String::new(),
+            extras: crate::sessions::SshExtras::default(),
         });
         self.result.added.push(host.alias.clone());
         Ok(id)

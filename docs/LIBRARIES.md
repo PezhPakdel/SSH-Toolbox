@@ -21,6 +21,7 @@ Results marked **CI** are decided by the first green CI run, since this PC can't
 | `keyring-core` + `windows-native-keyring-store` | 1.0.1 + 1.1.0 | `check_keychain`: set, read and delete `SSHToolbox-test`, then confirm it's gone | Windows (this PC) | **Works** |
 | `keyring-core` + `zbus-secret-service-keyring-store` | 1.0.1 + 1.0.1 | `check_keychain`: builds only | Linux | **CI.** See note 3 |
 | Tauri raw channel | 2.12 | Send bytes with `InvokeResponseBody::Raw`; check what type the interface receives | Windows (this PC) | **Works.** See note 4 |
+| `tauri-plugin-dialog` | 2.8.4 | Open a folder or file. Used for uploading a folder and for picking a configuration file | Windows | The plugin is the one named in PLAN.md. Pinned to the same version as the interface package |
 
 ## Notes
 

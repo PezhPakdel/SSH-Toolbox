@@ -144,6 +144,55 @@ pub async fn sessions_export() -> Result<String, AppError> {
     .map_err(|_| task_failed())?
 }
 
+/// Reads a MobaXterm session export or configuration and adds the SSH sessions.
+/// Passwords in that file are ignored. Other session kinds are reported and skipped.
+#[tauri::command]
+pub async fn moba_import(path: String) -> Result<toolbox_core::ssh::moba::MobaReport, AppError> {
+    let store = store()?;
+    tokio::task::spawn_blocking(move || {
+        let path = std::path::PathBuf::from(path.trim().trim_matches('"'));
+        let meta = std::fs::metadata(&path)
+            .map_err(|_| AppError::new(ErrorCode::NotFound, "That file couldn't be found."))?;
+        if !meta.is_file() || meta.len() > MAX_BACKUP {
+            return Err(AppError::new(
+                ErrorCode::InvalidInput,
+                "That file is too large to be a session list.",
+            ));
+        }
+        let bytes = std::fs::read(&path)
+            .map_err(|_| AppError::new(ErrorCode::InvalidInput, "That file couldn't be read."))?;
+        let text = toolbox_core::ssh::moba::decode_moba_bytes(&bytes);
+        let loaded = store.load();
+        if let Some(problem) = loaded.problem {
+            return Err(AppError::new(ErrorCode::InvalidInput, problem));
+        }
+        let mut file = loaded.file;
+        let user = default_user();
+        let report = toolbox_core::ssh::moba::apply_moba(&mut file, &text, &user);
+        file.validate()?;
+        store.save(&file)?;
+        Ok(report)
+    })
+    .await
+    .map_err(|_| task_failed())?
+}
+
+/// A user name for sessions whose export didn't name one. Never a password.
+fn default_user() -> String {
+    let raw = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_default();
+    let name = raw.trim();
+    if name.is_empty()
+        || name.len() > 200
+        || name.chars().any(|c| c.is_control() || c.is_whitespace())
+    {
+        "user".into()
+    } else {
+        name.to_string()
+    }
+}
+
 /// Adds the sessions of a backup file to the saved ones. What is already here is kept as it is.
 #[tauri::command]
 pub async fn sessions_import(

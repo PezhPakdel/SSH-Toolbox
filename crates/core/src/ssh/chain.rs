@@ -20,6 +20,8 @@ pub struct Hop {
     pub port: u16,
     pub user: String,
     pub method: LoginMethod,
+    /// Ports to tap before connecting, when this hop is reached directly.
+    pub knock: String,
 }
 
 fn method_of(auth: SshAuth, key_path: &str) -> LoginMethod {
@@ -42,6 +44,7 @@ fn hop_of(session: &SavedSession) -> Option<(Hop, &str)> {
             auth,
             key_path,
             jump,
+            extras,
             ..
         } => Some((
             Hop {
@@ -50,6 +53,7 @@ fn hop_of(session: &SavedSession) -> Option<(Hop, &str)> {
                 port: *port,
                 user: user.clone(),
                 method: method_of(*auth, key_path),
+                knock: extras.knock.clone(),
             },
             jump,
         )),
@@ -105,6 +109,13 @@ pub async fn connect_chain(
     let mut last: Option<Connection> = None;
     for (i, hop) in chain.iter().enumerate() {
         // Each hop is reached through the one just before it.
+        // A knock only makes sense for the first machine, the one this computer can reach.
+        // Later hops are reached through that machine, so knocking them from here would miss.
+        if last.is_none() && !hop.knock.trim().is_empty() {
+            crate::netops::knock_host(&hop.host, &hop.knock)
+                .await
+                .map_err(|e| on_hop(e, hop, i, chain.len()))?;
+        }
         let mut connection = match last.as_ref() {
             None => connect(
                 &hop.host,
@@ -185,6 +196,7 @@ mod tests {
             x11: false,
             color: String::new(),
             startup: String::new(),
+            extras: crate::sessions::SshExtras::default(),
         }
     }
 

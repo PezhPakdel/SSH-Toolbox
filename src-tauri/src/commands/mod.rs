@@ -8,6 +8,7 @@ pub mod keychain;
 pub mod keys;
 pub mod layout;
 pub mod link;
+pub mod net;
 pub mod platform;
 pub mod prompt;
 pub mod scan;

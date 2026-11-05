@@ -127,3 +127,17 @@ Decisions the builder made on its own, and anything blocked. Newest last.
 - Version 1.1.0 (2026-11-04): phase 7 first shipped under 1.0.0 by mistake. From now on the version goes up whenever features are added (minor) or only fixes are made (patch), in package.json, package-lock.json, tauri.conf.json and both Cargo.toml files, before the build.
 - Footer trends: CPU, memory, network speed and GPU have small graphs (last 60 readings). Network and GPU are new readings: the network is the sum of all connections except the loopback (from /proc/net/dev on a server, from sysinfo here), and the GPU comes from `nvidia-smi` (NVIDIA only; here it is asked once and given up on if it isn't there). Not tried on a real server, and GPU not tried on a machine with a card.
 - Also added: Ctrl plus, Ctrl minus and Ctrl 0 change the terminal text size; Duplicate in a session's right-click menu; the Docker button rows wrap instead of squashing.
+
+## More SSH tools (2026-11-05)
+- Version 1.2.0.
+
+## Folder upload, MobaXterm import, program name (2026-11-05)
+- Version 1.3.0. The program file is `SSH-Toolbox.exe` (`mainBinaryName`), not `app.exe`.
+- The server file list has Upload folder and Upload files, which open the system dialog and copy into the folder shown. The same copy already worked for a folder selected in the lower list.
+- File, Configurations imports a MobaXterm session export (`.mxtsessions`), a full configuration (`.mobaconf`) or `MobaXterm.ini`. SSH and SFTP sessions, their folders and jump hosts are added. Passwords are never copied. Remote desktop, VNC and browser sessions are skipped. The same screen still exports this app's sessions.
+- Decision: a MobaXterm colour is stored as red in the low byte, then green, then blue, matching the documented values (255 is red).
+- The file dialog uses `tauri-plugin-dialog` 2.8.4, the dialog library named in PLAN.md. The interface package is the same version.
+- Wake-on-LAN, ping, traceroute, a port knock before a direct connection, a note on a session, folder bookmarks in the file panel, a connection card (an `ssh` command with jump hosts and no passwords), and a link-time reading in the footer.
+- Decision: a port knock runs only for the first machine, the one this computer connects to directly. Knocking a host that is reached through a jump host would tap the wrong network.
+- Decision: the connection card and the `ssh` command never include a password or passphrase. A key is named by its file path, which the app already stores.
+- Decision: ping and traceroute are the operating system's own programs, with the host passed as one argument that cannot start with a dash. Nothing is sent through a shell.

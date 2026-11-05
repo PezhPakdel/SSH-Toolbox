@@ -4,6 +4,7 @@
   import { terminalWrite } from "../backend";
   import { shellQuote } from "./paths";
   import { promptRespond, type Prompt, type PromptResponse } from "../backend";
+  import { pickDirectory, pickFiles } from "../backend/dialog";
   import {
     filesClose,
     filesOpenFtp,
@@ -37,10 +38,14 @@
     follow?: string;
     /** The backend session of the active terminal, so the panel can send it a folder to go to. */
     terminalSession?: string;
+    /** Remote folders saved on this SSH session. */
+    bookmarks?: string[];
+    /** Remembers or forgets the folder currently shown. */
+    onbookmark?: (path: string) => void;
     onclose: () => void;
   }
 
-  let { source, follow = "", terminalSession = "", onclose }: Props = $props();
+  let { source, follow = "", terminalSession = "", bookmarks = [], onbookmark, onclose }: Props = $props();
 
   // Where the divider between the server's files and this computer's sits, as the top list's
   // share of the height. It can be dragged, and is kept for next time.
@@ -216,6 +221,15 @@
   });
   onDestroy(() => unlisten?.());
 
+  async function uploadPicked(kind: "folder" | "files") {
+    if (!local || !remote || !remotePath) return;
+    const paths =
+      kind === "folder"
+        ? [await pickDirectory("Folder to upload to the server")].filter((p): p is string => !!p)
+        : await pickFiles("Files to upload to the server");
+    if (paths.length) await queue(local.id, paths, remote.id, remotePath);
+  }
+
   async function queue(fromId: string, paths: string[], toId: string, toDir: string) {
     message = "";
     for (const path of paths) {
@@ -310,7 +324,26 @@
         <input type="checkbox" checked={following} onchange={toggleFollow} />
         Follow the terminal's folder
       </label>
+      {#if source.kind === "ssh" && onbookmark}
+        <button
+          class="btn small"
+          disabled={!remotePath}
+          title="Keep this folder on the session so you can jump back to it"
+          onclick={() => onbookmark?.(remotePath)}
+        >
+          {bookmarks.includes(remotePath) ? "Forget this folder" : "Bookmark this folder"}
+        </button>
+      {/if}
     </div>
+    {#if bookmarks.length}
+      <div class="bookmarks">
+        {#each bookmarks as path (path)}
+          <button class="chip" class:on={path === remotePath} title={path} onclick={() => (remotePath = path)}>
+            {path.split(/[/\\]/).filter(Boolean).slice(-2).join("/") || path}
+          </button>
+        {/each}
+      </div>
+    {/if}
     {#if following && !follow && source.kind === "ssh" && terminalSession}
       <p class="hint">
         This terminal hasn't reported its folder. Most shells don't until asked.
@@ -346,6 +379,8 @@
         ontransfer={(paths) => local && remote && queue(remote.id, paths, local.id, localPath)}
         onopenfile={openRemoteFile}
         oneditfile={(_e, path) => remote && (editing = { fileId: remote.id, path })}
+        onuploadfolder={local && remote ? () => void uploadPicked("folder") : undefined}
+        onuploadfiles={local && remote ? () => void uploadPicked("files") : undefined}
       />
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -463,6 +498,30 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
+  }
+  .bookmarks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 12px 6px;
+  }
+  .chip {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    height: 22px;
+    padding: 0 8px;
+    font-size: 11.5px;
+    color: var(--text);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .chip.on {
+    color: var(--on-accent);
+    background: var(--accent);
+    border-color: var(--accent);
   }
   .hint {
     margin: 0 12px 6px;

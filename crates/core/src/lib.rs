@@ -8,6 +8,7 @@ pub mod files;
 pub mod keychain;
 pub mod layout;
 pub mod link;
+pub mod netops;
 pub mod platform;
 pub mod prompt;
 pub mod reach;

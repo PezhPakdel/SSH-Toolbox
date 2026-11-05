@@ -291,6 +291,7 @@ fn save_session(w: &World, id: &str, port: u16) {
         x11: false,
         color: String::new(),
         startup: String::new(),
+        extras: crate::sessions::SshExtras::default(),
     });
     store.save(&file).unwrap();
     w.secrets

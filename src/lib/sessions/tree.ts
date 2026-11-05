@@ -84,6 +84,29 @@ export function checkSshForm(form: SshForm): string | null {
   return null;
 }
 
+/** The message for a bad wake address, or null. Empty is fine. */
+export function checkMac(mac: string): string | null {
+  const text = mac.trim();
+  if (!text) return null;
+  const hex = text.replace(/[:-\s]/g, "");
+  if (!/^[0-9a-fA-F]{12}$/.test(hex)) return "A wake address looks like aa:bb:cc:dd:ee:ff.";
+  return null;
+}
+
+/** The message for a bad port-knock list, or null. Empty is fine. */
+export function checkKnock(knock: string): string | null {
+  const text = knock.trim();
+  if (!text) return null;
+  const parts = text.split(/[,\s]+/).filter(Boolean);
+  if (parts.length > 8) return "A knock sequence can have at most 8 ports.";
+  for (const part of parts) {
+    const match = /^(\d{1,5})(?:\/(tcp|udp))?$/i.exec(part);
+    const port = match ? Number(match[1]) : 0;
+    if (!match || port < 1 || port > 65535) return "A knock is a port, or a port followed by /tcp or /udp.";
+  }
+  return null;
+}
+
 /** The message for the first thing wrong with an FTP form, or null if it is fine. */
 export function checkFtpForm(form: { name: string; host: string; port: string | number }): string | null {
   if (!form.name.trim()) return "Give the session a name.";

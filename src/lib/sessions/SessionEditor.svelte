@@ -3,7 +3,7 @@
   import { keychainSet } from "../backend";
   import type { Library } from "./library.svelte";
   import { COLOR_CHOICES } from "./colors.svelte";
-  import { checkSshForm, folderChoices, newId, type SshSession } from "./tree";
+  import { checkKnock, checkMac, checkSshForm, folderChoices, newId, type SshSession } from "./tree";
 
   interface Props {
     library: Library;
@@ -35,6 +35,9 @@
     x11: editing?.x11 ?? false,
     color: editing?.color ?? "",
     startup: editing?.startup ?? "",
+    mac: editing?.extras?.mac ?? "",
+    knock: editing?.extras?.knock ?? "",
+    note: editing?.extras?.note ?? "",
   }));
   let name = $state(start.name);
   let host = $state(start.host);
@@ -48,6 +51,9 @@
   let copyKey = $state(false);
   let color = $state(start.color);
   let startup = $state(start.startup);
+  let mac = $state(start.mac);
+  let knock = $state(start.knock);
+  let note = $state(start.note);
   // Typed here only to be passed to the keychain. They never go in the sessions file.
   let password = $state("");
   let passphrase = $state("");
@@ -74,7 +80,11 @@
   }
 
   async function save() {
-    const problem = checkSshForm({ name, host, port, user, auth, key_path: keyPath });
+    const problem =
+      checkSshForm({ name, host, port, user, auth, key_path: keyPath }) ||
+      checkMac(mac) ||
+      checkKnock(knock) ||
+      (note.length > 2000 ? "The note must be plain text, up to 2000 characters." : null);
     if (problem) {
       error = problem;
       return;
@@ -96,6 +106,12 @@
       x11,
       color,
       startup,
+      extras: {
+        mac: mac.trim(),
+        knock: knock.trim(),
+        note: note.trim(),
+        bookmarks: editing?.extras?.bookmarks ?? [],
+      },
     };
     const sessions = editing
       ? library.file.session.map((s) => (s.id === id ? session : s))
@@ -156,6 +172,22 @@
         <option value="key">Private key file</option>
         <option value="agent">SSH agent</option>
       </select>
+    </label>
+    <label class="field">
+      Note (optional)
+      <textarea rows="2" bind:value={note} placeholder="What this server is for"></textarea>
+      <small>Shown when you point at the session, and on the connection card. Don't put passwords here.</small>
+    </label>
+    <div class="row">
+      <label class="field grow">
+        Wake-on-LAN address (optional)
+        <input type="text" bind:value={mac} spellcheck="false" placeholder="aa:bb:cc:dd:ee:ff" />
+      </label>
+    </div>
+    <label class="field">
+      Port knock before connecting (optional)
+      <input type="text" bind:value={knock} spellcheck="false" placeholder="7000, 8000/udp, 9000" />
+      <small>Tapped only when this computer connects directly. A session reached through a jump host is not knocked from here.</small>
     </label>
     <label class="field">
       Commands to run after connecting (optional)

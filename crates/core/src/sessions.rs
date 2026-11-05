@@ -63,6 +63,32 @@ pub enum FtpSecurity {
     Implicit,
 }
 
+/// Extra SSH tools kept with a session. Old files omit this and get the defaults.
+/// None of these fields can hold a password.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SshExtras {
+    /// Wake-on-LAN address, or empty.
+    pub mac: String,
+    /// Ports to tap before a direct connection, such as `7000, 8000/udp`.
+    pub knock: String,
+    /// A reminder. Saved as plain text, so it must not contain a password.
+    pub note: String,
+    /// Remote folders to jump back to in the file panel.
+    pub bookmarks: Vec<String>,
+}
+
+impl Default for SshExtras {
+    fn default() -> Self {
+        Self {
+            mac: String::new(),
+            knock: String::new(),
+            note: String::new(),
+            bookmarks: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SavedSession {
@@ -90,6 +116,9 @@ pub enum SavedSession {
         /// Commands typed once when the shell is ready, one per line. Not for secrets.
         #[serde(default)]
         startup: String,
+        /// Wake address, port knock, note and folder bookmarks.
+        #[serde(default)]
+        extras: SshExtras,
     },
     Serial {
         id: String,
@@ -247,8 +276,10 @@ impl SessionsFile {
                     jump,
                     color,
                     startup,
+                    extras,
                     ..
                 } => {
+                    crate::netops::check_extras(extras)?;
                     if startup.len() > 2000
                         || startup
                             .chars()
@@ -531,6 +562,7 @@ mod tests {
             x11: false,
             color: String::new(),
             startup: String::new(),
+            extras: SshExtras::default(),
         }
     }
 
@@ -831,5 +863,35 @@ mod tests {
             _ => panic!(),
         }
         assert!(here.validate().is_ok(), "{:?}", here.validate());
+    }
+
+    #[test]
+    fn an_older_session_file_still_loads_and_a_bad_wake_address_does_not() {
+        let text = r#"
+version = 1
+
+[[session]]
+type = "ssh"
+id = "s1"
+name = "box"
+folder = ""
+host = "h.example"
+port = 22
+user = "u"
+auth = "agent"
+key_path = ""
+jump = ""
+"#;
+        let file = SessionsFile::from_toml(text).unwrap();
+        match &file.sessions[0] {
+            SavedSession::Ssh { extras, .. } => assert!(extras.mac.is_empty()),
+            _ => panic!(),
+        }
+
+        let mut bad = file;
+        if let SavedSession::Ssh { extras, .. } = &mut bad.sessions[0] {
+            extras.mac = "not-a-mac".into();
+        }
+        assert!(bad.validate().is_err());
     }
 }

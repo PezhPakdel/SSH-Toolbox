@@ -658,7 +658,7 @@
 
 <aside class="panel" aria-label="Docker">
   <header>
-    <span class="heading"><Icon name="box" size={16} /> Docker{#if shownName}<span class="where">{shownName}</span>{/if}</span>
+    <span class="heading"><Icon name="docker" size={16} /> Docker{#if shownName}<span class="where">{shownName}</span>{/if}</span>
     <div class="head-tools">
       {#if !useLocal && !connecting}
         <button class="btn small" title="Use the Docker on this computer instead" onclick={useThisComputer}>

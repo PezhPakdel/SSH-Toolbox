@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { SavedSession, SessionsFile } from "../backend";
 import {
   buildTree,
+  checkKnock,
+  checkMac,
   checkSshForm,
   folderChoices,
   removeFolder,
@@ -107,6 +109,17 @@ describe("checkSshForm", () => {
     expect(checkSshForm({ ...ok, user: "" })).toMatch(/user/);
     expect(checkSshForm({ ...ok, auth: "key" })).toMatch(/key/);
     expect(checkSshForm({ ...ok, auth: "key", key_path: "~/.ssh/id" })).toBeNull();
+  });
+});
+
+describe("wake address and port knock", () => {
+  it("accepts a blank or a real address, and a short knock list", () => {
+    expect(checkMac("")).toBeNull();
+    expect(checkMac("aa:bb:cc:dd:ee:ff")).toBeNull();
+    expect(checkMac("not-a-mac")).toMatch(/aa:bb/);
+    expect(checkKnock("")).toBeNull();
+    expect(checkKnock("7000, 8000/udp")).toBeNull();
+    expect(checkKnock("22/icmp")).toMatch(/port/);
   });
 });
 

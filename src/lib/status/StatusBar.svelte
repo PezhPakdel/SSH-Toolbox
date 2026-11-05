@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { linkProbe } from "../backend/net";
   import { statsLocal, statsRemote, type Stats } from "../backend/status";
   import { settings } from "../settings.svelte";
   import Spark from "../docker/Spark.svelte";
@@ -7,7 +8,9 @@
 
   interface Props {
     /** Whose load to show: a connected SSH session, or this computer. */
-    target: { kind: "ssh"; id: string; name: string } | { kind: "local" };
+    target:
+      | { kind: "ssh"; id: string; name: string; host: string; port: number }
+      | { kind: "local" };
   }
 
   let { target }: Props = $props();
@@ -22,6 +25,8 @@
   let gpuHistory = $state<number[]>([]);
   let speed = $state<{ rx: number; tx: number } | null>(null);
   let lastNet: NetSample | null = null;
+  let linkMs = $state<number | null>(null);
+  let linkHistory = $state<number[]>([]);
 
   const key = $derived(target.kind === "ssh" ? `ssh:${target.id}` : "local");
 
@@ -39,6 +44,8 @@
     gpuHistory = [];
     speed = null;
     lastNet = null;
+    linkMs = null;
+    linkHistory = [];
     let stopped = false;
     let busy = false;
 
@@ -47,6 +54,17 @@
       busy = true;
       try {
         const got = wanted.kind === "ssh" ? await statsRemote(wanted.id) : await statsLocal();
+        if (wanted.kind === "ssh") {
+          try {
+            const ms = await linkProbe(wanted.host, wanted.port);
+            if (!stopped) {
+              linkMs = ms;
+              linkHistory = pushReading(linkHistory, ms);
+            }
+          } catch {
+            if (!stopped) linkMs = null;
+          }
+        }
         if (stopped) return;
         stats = got;
         if (got) record(got);
@@ -96,6 +114,16 @@
 
 <footer class="status" aria-label="Load">
   <span class="where">{target.kind === "ssh" ? target.name : "This computer"}</span>
+  {#if target.kind === "ssh" && linkMs !== null}
+    <span
+      class="metric"
+      title="How long it takes to open a connection to this server. Quick is under 40 ms, steady under 120 ms."
+    >
+      <span class="label">Link</span>
+      <span class="value">{linkMs} ms · {linkMs < 40 ? "quick" : linkMs < 120 ? "steady" : "slow"}</span>
+      <Spark values={linkHistory} width={44} height={14} label="Connection time over the last minutes" />
+    </span>
+  {/if}
   {#if stats}
     <span class="metric" title="Processor in use">
       <span class="label">CPU</span>
